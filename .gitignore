@@ -1,0 +1,5 @@
+.env
+node_modules/
+*.csv
+stress-test-round-*/
+pending-reference-updates.md

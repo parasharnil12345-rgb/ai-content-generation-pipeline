@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Content Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f4f6fa;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    header .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #2563eb;
+      letter-spacing: -0.5px;
+    }
+
+    header .logo svg { flex-shrink: 0; }
+
+    header p {
+      margin-top: 6px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    .field { margin-bottom: 20px; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+      letter-spacing: .3px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #111827;
+      transition: border-color .15s;
+      outline: none;
+    }
+
+    input[type="text"]:focus { border-color: #2563eb; }
+
+    .hint {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 5px;
+    }
+
+    .country-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    .country-badge.au { background: #dbeafe; color: #1d4ed8; }
+    .country-badge.nz { background: #d1fae5; color: #065f46; }
+    .country-badge.unknown { background: #fee2e2; color: #991b1b; }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 13px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+
+    button[type="submit"]:hover { background: #1d4ed8; }
+    button[type="submit"]:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* Progress */
+    #progress { margin-top: 28px; display: none; }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #f9fafb;
+      border: 1.5px solid #e5e7eb;
+      font-size: 14px;
+      color: #6b7280;
+      transition: all .2s;
+    }
+
+    .step.active {
+      border-color: #2563eb;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-weight: 500;
+    }
+
+    .step.done {
+      border-color: #10b981;
+      background: #ecfdf5;
+      color: #065f46;
+    }
+
+    .step .icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+
+    .step.active .icon { border-color: #2563eb; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #93c5fd;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Output */
+    #output-section { display: none; margin-top: 8px; }
+
+    #output-section h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .copy-btn {
+      margin-left: auto;
+      padding: 5px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: #374151;
+      transition: all .15s;
+    }
+
+    .copy-btn:hover { border-color: #2563eb; color: #2563eb; }
+
+    #output {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      max-height: 600px;
+      overflow-y: auto;
+      color: #1e293b;
+      scroll-behavior: smooth;
+    }
+
+    #output.streaming::after {
+      content: '▍';
+      display: inline-block;
+      animation: blink .8s step-end infinite;
+      color: #2563eb;
+      margin-left: 1px;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Rendered markdown styles ─────────────────────────────────────── */
+    #output.rendered {
+      white-space: normal;
+      max-height: none;
+      font-size: 15px;
+    }
+
+    #output.rendered h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #111827;
+      margin: 0 0 18px;
+      line-height: 1.3;
+    }
+
+    #output.rendered h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1d4ed8;
+      margin: 28px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e5e7eb;
+      line-height: 1.4;
+    }
+
+    #output.rendered h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin: 20px 0 8px;
+    }
+
+    #output.rendered h3.stage {
+      padding: 8px 14px;
+      border-left: 4px solid #10b981;
+      background: #ecfdf5;
+      color: #065f46;
+      border-radius: 0 6px 6px 0;
+      margin: 16px 0 10px;
+    }
+
+    #output.rendered p {
+      margin: 0 0 14px;
+      line-height: 1.8;
+    }
+
+    #output.rendered p.source-note {
+      font-size: 12px;
+      color: #6b7280;
+      font-style: italic;
+      margin-top: -8px;
+    }
+
+    #output.rendered ul, #output.rendered ol {
+      margin: 0 0 16px;
+      padding-left: 22px;
+    }
+
+    #output.rendered li {
+      margin-bottom: 8px;
+      line-height: 1.7;
+    }
+
+    #output.rendered a {
+      color: #2563eb;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    #output.rendered a:hover { color: #1d4ed8; }
+
+    #output.rendered strong { font-weight: 700; }
+
+    #output.rendered table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      font-size: 13px;
+    }
+
+    #output.rendered th {
+      background: #f1f5f9;
+      font-weight: 600;
+      padding: 9px 12px;
+      text-align: left;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+    }
+
+    #output.rendered td {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+      line-height: 1.6;
+    }
+
+    #output.rendered tr:nth-child(even) td { background: #f8fafc; }
+
+    .word-count {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 8px;
+      text-align: right;
+    }
+
+    #error-msg {
+      display: none;
+      background: #fef2f2;
+      border: 1.5px solid #fca5a5;
+      color: #991b1b;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect width="28" height="28" rx="7" fill="#2563eb"/>
+      <path d="M7 14h14M14 7v14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    AI Content Generator
+  </div>
+  <p>Generate SEO landing pages for a graduate jobs platform</p>
+</header>
+
+<div class="card">
+  <form id="gen-form">
+    <div class="field">
+      <label for="keyword">Target Keyword</label>
+      <input type="text" id="keyword" name="keyword"
+             placeholder="e.g. engineering internships Australia"
+             autocomplete="off" required />
+      <div class="hint">The primary keyword this landing page will rank for</div>
+    </div>
+
+    <div class="field">
+      <label for="pageUrl">Page URL</label>
+      <input type="text" id="pageUrl" name="pageUrl"
+             placeholder="e.g. https://au.your-platform.com/engineering-internships"
+             autocomplete="off" required />
+      <div class="hint">Must be on au.your-platform.com or nz.your-platform.com</div>
+      <div id="country-badge"></div>
+    </div>
+
+    <button type="submit" id="submit-btn">Generate Landing Page</button>
+  </form>
+
+  <div id="error-msg"></div>
+
+  <div id="progress">
+    <div class="steps" id="steps-list"></div>
+  </div>
+
+  <div id="output-section">
+    <h2>
+      Generated Content
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="copy-btn" id="copy-btn">Copy</button>
+        <button class="copy-btn" id="doc-btn">Download .docx</button>
+      </div>
+    </h2>
+    <div id="output"></div>
+    <div class="word-count" id="word-count"></div>
+  </div>
+</div>
+
+<script>
+  // ── Markdown parser ────────────────────────────────────────────────────────
+
+  function inlineMd(text) {
+    // Single pass, priority order: bold-hyperlink, then plain hyperlink, then standalone bold.
+    // Matching links before bold avoids **[Employer](url)** being swallowed as literal bold text,
+    // and the URL group tolerates one level of parentheses inside the URL itself.
+    const urlBody = '(?:[^()]|\\([^()]*\\))*';
+    const re = new RegExp(
+      `\\*\\*\\[([^\\]]+)\\]\\((${urlBody})\\)\\*\\*` +
+      `|\\[([^\\]]+)\\]\\((${urlBody})\\)` +
+      `|\\*\\*(.+?)\\*\\*`,
+      'g'
+    );
+    let result = '';
+    let lastIdx = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > lastIdx) result += text.slice(lastIdx, m.index);
+      if (m[1] !== undefined) {
+        result += `<a href="${m[2]}" target="_blank" rel="noopener"><strong>${m[1]}</strong></a>`;
+      } else if (m[3] !== undefined) {
+        result += `<a href="${m[4]}" target="_blank" rel="noopener">${m[3]}</a>`;
+      } else {
+        result += `<strong>${m[5]}</strong>`;
+      }
+      lastIdx = re.lastIndex;
+    }
+    result += text.slice(lastIdx);
+    return result;
+  }
+
+  function isSeparatorRow(row) {
+    return row.split('|').every(cell => /^[\s\-:|]*$/.test(cell));
+  }
+
+  function renderTable(lines) {
+    const dataRows = lines.filter(l => !isSeparatorRow(l));
+    if (!dataRows.length) return '';
+    let html = '<table>';
+    dataRows.forEach((row, idx) => {
+      const cells = row.split('|').slice(1, -1).map(c => c.trim());
+      const tag = idx === 0 ? 'th' : 'td';
+      html += '<tr>' + cells.map(c => `<${tag}>${inlineMd(c)}</${tag}>`).join('') + '</tr>';
+    });
+    return html + '</table>';
+  }
+
+  function parseMarkdown(md) {
+    const lines = md.split('\n');
+    let html = '';
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // H3 (check before H2/H1 to avoid prefix collision)
+      if (/^### /.test(line)) {
+        const content = inlineMd(line.slice(4));
+        const isStage = line.includes('✅');
+        html += `<h3${isStage ? ' class="stage"' : ''}>${content}</h3>`;
+        i++; continue;
+      }
+
+      // H2
+      if (/^## /.test(line)) {
+        html += `<h2>${inlineMd(line.slice(3))}</h2>`;
+        i++; continue;
+      }
+
+      // H1
+      if (/^# /.test(line)) {
+        html += `<h1>${inlineMd(line.slice(2))}</h1>`;
+        i++; continue;
+      }
+
+      // Table (collect consecutive pipe lines)
+      if (/^\|/.test(line)) {
+        const tableLines = [];
+        while (i < lines.length && /^\|/.test(lines[i])) {
+          tableLines.push(lines[i++]);
+        }
+        html += renderTable(tableLines);
+        continue;
+      }
+
+      // Unordered list
+      if (/^[-*] /.test(line)) {
+        html += '<ul>';
+        while (i < lines.length && /^[-*] /.test(lines[i])) {
+          html += `<li>${inlineMd(lines[i].slice(2))}</li>`;
+          i++;
+        }
+        html += '</ul>';
+        continue;
+      }
+
+      // Blank line
+      if (line.trim() === '') { i++; continue; }
+
+      // Paragraph — collect consecutive non-special lines
+      const para = [];
+      while (
+        i < lines.length &&
+        lines[i].trim() !== '' &&
+        !/^[#|]/.test(lines[i]) &&
+        !/^[-*] /.test(lines[i])
+      ) {
+        para.push(lines[i++]);
+      }
+      if (para.length) {
+        const text = inlineMd(para.join(' '));
+        const isSource = para[0].trim().startsWith('Source:');
+        html += `<p${isSource ? ' class="source-note"' : ''}>${text}</p>`;
+      }
+    }
+
+    return html;
+  }
+
+  // ── Word counter (on raw markdown) ────────────────────────────────────────
+  function countWords(text) {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  // ── .docx export (server-side via /api/download) ─────────────────────────
+  async function downloadDocx(markdown, keyword) {
+    const btn = document.getElementById('doc-btn');
+    btn.textContent = 'Downloading…';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markdown, keyword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Download failed' }));
+        throw new Error(err.error || 'Download failed');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = keyword.replace(/\s+/g, '-').toLowerCase() + '.docx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Download failed: ' + err.message);
+    } finally {
+      btn.textContent = 'Download .docx';
+      btn.disabled = false;
+    }
+  }
+
+  // ── UI state ───────────────────────────────────────────────────────────────
+
+  const STEPS = [
+    { label: 'SERP research',         desc: 'Top results, PAA questions, related searches' },
+    { label: 'Reddit research',       desc: 'Student discussions and pain points' },
+    { label: 'Market stats',          desc: 'Current salary and job data via Gemini' },
+    { label: 'Platform internal data', desc: 'Career path, employers, salaries, city pages' },
+    { label: 'Writing content',       desc: 'Claude drafting the 1,200–1,400 word page' },
+  ];
+
+  let stepStatus = STEPS.map(() => 'pending');
+  let rawMarkdown = '';
+  let currentKeyword = '';
+
+  const urlInput = document.getElementById('pageUrl');
+  const badge = document.getElementById('country-badge');
+
+  urlInput.addEventListener('input', () => {
+    const val = urlInput.value.trim();
+    if (val.includes('au.your-platform.com')) {
+      badge.innerHTML = '<span class="country-badge au">Australia</span>';
+    } else if (val.includes('nz.your-platform.com')) {
+      badge.innerHTML = '<span class="country-badge nz">New Zealand</span>';
+    } else if (val.length > 0) {
+      badge.innerHTML = '<span class="country-badge unknown">Not a recognised platform URL</span>';
+    } else {
+      badge.innerHTML = '';
+    }
+  });
+
+  function renderSteps() {
+    const list = document.getElementById('steps-list');
+    list.innerHTML = STEPS.map((s, i) => {
+      const status = stepStatus[i];
+      let cls = 'step';
+      let icon = `<span class="icon">${i + 1}</span>`;
+      if (status === 'done') { cls += ' done'; icon = `<span class="icon">✓</span>`; }
+      else if (status === 'active') { cls += ' active'; icon = `<div class="spinner"></div>`; }
+      return `<div class="${cls}">${icon}<div><strong>${s.label}</strong> — ${s.desc}</div></div>`;
+    }).join('');
+  }
+
+  document.getElementById('gen-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const keyword = document.getElementById('keyword').value.trim();
+    const pageUrl = document.getElementById('pageUrl').value.trim();
+    currentKeyword = keyword;
+
+    const btn         = document.getElementById('submit-btn');
+    const errorEl     = document.getElementById('error-msg');
+    const progressEl  = document.getElementById('progress');
+    const outputSection = document.getElementById('output-section');
+    const outputEl    = document.getElementById('output');
+    const wordCountEl = document.getElementById('word-count');
+
+    // Reset
+    stepStatus = STEPS.map(() => 'pending');
+    rawMarkdown = '';
+    errorEl.style.display = 'none';
+    outputSection.style.display = 'none';
+    outputEl.className = '';        // clear rendered/streaming classes
+    outputEl.textContent = '';
+    wordCountEl.textContent = '';
+    progressEl.style.display = 'block';
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    renderSteps();
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, pageUrl }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Server error');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const msg = JSON.parse(line.slice(6));
+
+          if (msg.type === 'step') {
+            stepStatus[msg.step - 1] = 'active';
+            renderSteps();
+
+          } else if (msg.type === 'step_done') {
+            stepStatus[msg.step - 1] = 'done';
+            renderSteps();
+
+          } else if (msg.type === 'token') {
+            rawMarkdown += msg.text;
+            if (outputSection.style.display === 'none') {
+              outputSection.style.display = 'block';
+              outputEl.classList.add('streaming');
+            }
+            // Show raw text while streaming; rendered on complete
+            outputEl.textContent = rawMarkdown;
+            outputEl.scrollTop = outputEl.scrollHeight;
+
+          } else if (msg.type === 'complete') {
+            stepStatus[4] = 'done';
+            renderSteps();
+            progressEl.style.display = 'none';
+            // Server post-processes the streamed text (e.g. em dash removal) after
+            // the full response is assembled — use that cleaned copy from here on.
+            if (typeof msg.markdown === 'string') rawMarkdown = msg.markdown;
+            // Switch to rendered markdown
+            outputEl.classList.remove('streaming');
+            outputEl.classList.add('rendered');
+            outputEl.innerHTML = parseMarkdown(rawMarkdown);
+            wordCountEl.textContent = `Word count: ${countWords(rawMarkdown).toLocaleString()}`;
+
+          } else if (msg.type === 'error') {
+            throw new Error(msg.message);
+          }
+        }
+      }
+    } catch (err) {
+      progressEl.style.display = 'none';
+      errorEl.textContent = `Error: ${err.message}`;
+      errorEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate Landing Page';
+    }
+  });
+
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(rawMarkdown).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+  });
+
+  document.getElementById('doc-btn').addEventListener('click', () => {
+    if (!rawMarkdown) return;
+    downloadDocx(rawMarkdown, currentKeyword);
+  });
+</script>
+</body>
+</html>
